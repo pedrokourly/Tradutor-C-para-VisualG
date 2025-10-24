@@ -3,75 +3,136 @@
 %option noyywrap
 %option nodefault
 %option yylineno
+%option case-insensitive 
 
-%{
-    #include "symbol.h" // Inclua o arquivo de cabeçalho para a tabela de símbolos
-    #include "parser.tab.h" // Inclua o arquivo gerado pelo Bison para as definições dos tokens
+%{%
+    #include "symbol.h"
+    #include "parser.tab.h"
 %}
 
-
- // Definições para as regras
 %%
+
+[ \t\n\r]+         { /* Ignora espaço, tab, newline E carriage return */ }
+"//".* { }
+"{"[^{}]*"}"      { }
 
 "+"             { return PLUS; }
 "-"             { return MINUS; }
 "*"             { return TIMES; }
 "/"             { return DIVIDE; }
-"="             { return ASSIGN; }
-"=="            { return EQUAL; }
-"!="            { return NEQ; }
+"\\"            { return INT_DIVIDE; }
+"^"             { return POWER; }
+
+"<-"            { return ASSIGN; }
+
+"="             { return EQUAL; }
+"<>"            { return NEQ; }
 "<"             { return LT; }
 ">"             { return GT; }
 "<="            { return LTE; }
 ">="            { return GTE; }
 
-";"             { return SEMICOLON; }
 "("             { return LPAREN; }
 ")"             { return RPAREN; }
-"{"             { return LBRACE; }
-"}"             { return RBRACE; }
+"["             { return LBRACKET; }
+"]"             { return RBRACKET; }
 ","             { return COMMA; }
+":"             { return COLON; }
 
-"if"            { return IF; }
-"else"          { return ELSE; }
-"while"         { return WHILE; }
-"return"        { return RETURN; }
+"inteiro"       { return INTEIRO; }
+"real"          { return REAL; }
+"numerico"      { return REAL; }
+"caracter"      { return CARACTER; }
+"literal"       { return LITERAL; }
+"logico"        { return LOGICO; }
+"verdadeiro"    { return VERDADEIRO; }
+"falso"         { return FALSO; }
 
-"float"         { return FLOAT; }
-"int"           { return INT; }
-"char"          { return CHAR; }   // Tipo char adicionado
-"string"        { return STRING; } // Tipo string adicionado
+"algoritmo"     { return ALGORITMO; }
+"fimalgoritmo"  { return FIMALGORITMO; }
+"var"           { return VAR; }
+"inicio"        { return INICIO; }
+"funcao"        { return FUNCAO; }
+"função"        { return FUNCAO; }
+"fimfuncao"     { return FIMFUNCAO; }
+"procedimento"  { return PROCEDIMENTO; }
+"fimprocedimento" { return FIMPROCEDIMENTO; }
+"retorne"       { return RETORNE; }
 
-[a-zA-Z][a-zA-Z0-9]* {
-                  // Lida com identificadores.
-                  // Você pode adicionar um passo para verificar se o identificador é uma palavra-chave
-                  // se não for feito nas regras acima.
+"se"            { return SE; }
+"entao"         { return ENTAO; }
+"senao"         { return SENAO; }
+"fimse"         { return FIMSE; }
+"enquanto"      { return ENQUANTO; }
+"faca"          { return FACA; }
+"fimenquanto"   { return FIMENQUANTO; }
+"para"          { return PARA; }
+"de"            { return DE; }
+"ate"           { return ATE; }
+"passo"         { return PASSO; }
+"fimpara"       { return FIMPARA; }
+"repita"        { return REPITA; }
+"escolha"       { return ESCOLHA; }
+"caso"         { return CASO; }
+"outrocaso"     { return OUTROCASO; }
+"fimescolha"    { return FIMESCOLHA; }
+"interrompa"    { return INTERROMPA; }
+
+"leia"          { return LEIA; }
+"escreva"       { return ESCREVA; }
+"escreval"      { return ESCREVAL; }
+
+"e"             { return E; }
+"ou"            { return OU; }
+"nao"           { return NAO; }
+"xou"           { return XOU; }
+
+"aleatorio"     { return ALEATORIO; }
+"abs"           { return ABS; }
+"arccos"        { return ARCCOS; }
+"arcsen"        { return ARCSEN; }
+"arctan"        { return ARCTAN; }
+"arquivo"       { return ARQUIVO; }
+"asc"           { return ASC; }
+"compr"         { return COMPR; }
+"copia"         { return COPIA; }
+"cos"           { return COS; }
+"cotan"         { return COTAN; }
+"cronometro"    { return CRONOMETRO; }
+"debug"         { return DEBUG; }
+"eco"           { return ECO; }
+"exp"           { return EXP; }
+"grauprad"      { return GRAUPRAD; }
+"int"           { return INT_FUNC; }
+"log"           { return LOG; }
+"logn"          { return LOGN; }
+"maiusc"        { return MAIUSC; }
+"minusc"        { return MINUSC; }
+"numpcarac"     { return NUMPCARAC; }
+"pausa"         { return PAUSA; }
+"pi"            { return PI; }
+"pos"           { return POS; }
+"quad"          { return QUAD; }
+"radpgrau"      { return RADPGRAU; }
+"raizq"         { return RAIZQ; }
+"rand"          { return RAND; }
+"randi"         { return RANDI; }
+"sen"           { return SEN; }
+"timer"         { return TIMER; }
+"tan"           { return TAN; }
+
+[0-9]+\\.[0-9]+([eE][-+]?[0-9]+)?   { yylval.fval = atof(yytext); return FLOAT_LITERAL; }
+[0-9]+                             { yylval.ival = atoi(yytext); return NUMBER; }
+'[^']'                             { yylval.cval = yytext[1]; return CHAR_LITERAL; }
+\"([^\\\"]|\\.)*\"                 { yylval.sval = strdup(yytext); return STRING_LITERAL; }
+
+[a-zA-Z][a-zA-Z0-9_]* {
                   yylval.sval = strdup(yytext);
                   return IDENTIFIER;
                 }
 
-[0-9]+\.[0-9]+([eE][-+]?[0-9]+)?   { yylval.fval = atof(yytext); return FLOAT_LITERAL; }
-
-[0-9]+                             { yylval.ival = atoi(yytext); return NUMBER; }
-
-'\\.'                              { yylval.cval = yytext[1]; return CHAR_LITERAL; }
-'[^\\\n]'                          { yylval.cval = yytext[1]; return CHAR_LITERAL; }
-
-
-\"([^\\\"]|\\.)*\"                 { yylval.sval = strdup(yytext); return STRING_LITERAL; }
-
-
-[ \t\n]+                           { /* Ignora espaços em branco, tabulações e quebras de linha */ }
-
-"/*"([^*]|\*+[^*/])*\*+"/"         { /* ignora comentário de bloco */ }
-
-"//".*                             { /* ignora comentário de linha */ }
-
-
-
-. { // Caractere desconhecido. Você pode adicionar uma rotina de tratamento de erro aqui.
-    fprintf(stderr,"Erro léxico: caractere desconhecido '%s' (linha %d)\n", yytext, yylineno); /* continue */ 
-  }
-
+. {
+    fprintf(stderr, "Erro Léxico: Caractere inesperado '%s' na linha %d\n", yytext, yylineno);
+}
 
 %%

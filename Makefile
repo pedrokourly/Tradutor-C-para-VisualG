@@ -8,7 +8,7 @@ run:
 	./bin/tradutor.exe sample/exemplo_$(N).c
 
 teste: 
-	./bin/tradutor.exe sample/correto_0.c
+	./bin/tradutor.exe sample/visualg_sample_1.alg
 
 compile: clean parser scanner
 	mkdir -p $(BIN_DIR)

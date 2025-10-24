@@ -55,35 +55,104 @@ extern int yydebug;
     YYerror = 256,                 /* error  */
     YYUNDEF = 257,                 /* "invalid token"  */
     IDENTIFIER = 258,              /* IDENTIFIER  */
-    INT = 259,                     /* INT  */
-    NUMBER = 260,                  /* NUMBER  */
-    FLOAT = 261,                   /* FLOAT  */
-    FLOAT_LITERAL = 262,           /* FLOAT_LITERAL  */
-    CHAR = 263,                    /* CHAR  */
-    CHAR_LITERAL = 264,            /* CHAR_LITERAL  */
-    STRING = 265,                  /* STRING  */
-    STRING_LITERAL = 266,          /* STRING_LITERAL  */
-    IF = 267,                      /* IF  */
-    ELSE = 268,                    /* ELSE  */
-    WHILE = 269,                   /* WHILE  */
-    RETURN = 270,                  /* RETURN  */
-    PLUS = 271,                    /* PLUS  */
-    MINUS = 272,                   /* MINUS  */
-    TIMES = 273,                   /* TIMES  */
-    DIVIDE = 274,                  /* DIVIDE  */
-    ASSIGN = 275,                  /* ASSIGN  */
-    EQUAL = 276,                   /* EQUAL  */
-    NEQ = 277,                     /* NEQ  */
-    LT = 278,                      /* LT  */
-    GT = 279,                      /* GT  */
-    LTE = 280,                     /* LTE  */
-    GTE = 281,                     /* GTE  */
-    SEMICOLON = 282,               /* SEMICOLON  */
-    LPAREN = 283,                  /* LPAREN  */
-    RPAREN = 284,                  /* RPAREN  */
-    LBRACE = 285,                  /* LBRACE  */
-    RBRACE = 286,                  /* RBRACE  */
-    COMMA = 287                    /* COMMA  */
+    NUMBER = 259,                  /* NUMBER  */
+    FLOAT_LITERAL = 260,           /* FLOAT_LITERAL  */
+    CHAR_LITERAL = 261,            /* CHAR_LITERAL  */
+    STRING_LITERAL = 262,          /* STRING_LITERAL  */
+    INTEIRO = 263,                 /* INTEIRO  */
+    REAL = 264,                    /* REAL  */
+    CARACTER = 265,                /* CARACTER  */
+    LITERAL = 266,                 /* LITERAL  */
+    LOGICO = 267,                  /* LOGICO  */
+    VERDADEIRO = 268,              /* VERDADEIRO  */
+    FALSO = 269,                   /* FALSO  */
+    SE = 270,                      /* SE  */
+    ENTAO = 271,                   /* ENTAO  */
+    SENAO = 272,                   /* SENAO  */
+    FIMSE = 273,                   /* FIMSE  */
+    ENQUANTO = 274,                /* ENQUANTO  */
+    FACA = 275,                    /* FACA  */
+    FIMENQUANTO = 276,             /* FIMENQUANTO  */
+    REPITA = 277,                  /* REPITA  */
+    ATE = 278,                     /* ATE  */
+    PARA = 279,                    /* PARA  */
+    DE = 280,                      /* DE  */
+    PASSO = 281,                   /* PASSO  */
+    FIMPARA = 282,                 /* FIMPARA  */
+    ESCOLHA = 283,                 /* ESCOLHA  */
+    CASO = 284,                    /* CASO  */
+    OUTROCASO = 285,               /* OUTROCASO  */
+    FIMESCOLHA = 286,              /* FIMESCOLHA  */
+    INTERROMPA = 287,              /* INTERROMPA  */
+    RETORNE = 288,                 /* RETORNE  */
+    PLUS = 289,                    /* PLUS  */
+    MINUS = 290,                   /* MINUS  */
+    TIMES = 291,                   /* TIMES  */
+    DIVIDE = 292,                  /* DIVIDE  */
+    ASSIGN = 293,                  /* ASSIGN  */
+    EQUAL = 294,                   /* EQUAL  */
+    NEQ = 295,                     /* NEQ  */
+    LT = 296,                      /* LT  */
+    GT = 297,                      /* GT  */
+    LTE = 298,                     /* LTE  */
+    GTE = 299,                     /* GTE  */
+    INT_DIVIDE = 300,              /* INT_DIVIDE  */
+    POWER = 301,                   /* POWER  */
+    E = 302,                       /* E  */
+    OU = 303,                      /* OU  */
+    NAO = 304,                     /* NAO  */
+    XOU = 305,                     /* XOU  */
+    LPAREN = 306,                  /* LPAREN  */
+    RPAREN = 307,                  /* RPAREN  */
+    LBRACKET = 308,                /* LBRACKET  */
+    RBRACKET = 309,                /* RBRACKET  */
+    COMMA = 310,                   /* COMMA  */
+    COLON = 311,                   /* COLON  */
+    ALGORITMO = 312,               /* ALGORITMO  */
+    FIMALGORITMO = 313,            /* FIMALGORITMO  */
+    VAR = 314,                     /* VAR  */
+    INICIO = 315,                  /* INICIO  */
+    FUNCAO = 316,                  /* FUNCAO  */
+    FIMFUNCAO = 317,               /* FIMFUNCAO  */
+    PROCEDIMENTO = 318,            /* PROCEDIMENTO  */
+    FIMPROCEDIMENTO = 319,         /* FIMPROCEDIMENTO  */
+    LEIA = 320,                    /* LEIA  */
+    ESCREVA = 321,                 /* ESCREVA  */
+    ESCREVAL = 322,                /* ESCREVAL  */
+    ALEATORIO = 323,               /* ALEATORIO  */
+    ABS = 324,                     /* ABS  */
+    ARCCOS = 325,                  /* ARCCOS  */
+    ARCSEN = 326,                  /* ARCSEN  */
+    ARCTAN = 327,                  /* ARCTAN  */
+    ARQUIVO = 328,                 /* ARQUIVO  */
+    ASC = 329,                     /* ASC  */
+    COMPR = 330,                   /* COMPR  */
+    COPIA = 331,                   /* COPIA  */
+    COS = 332,                     /* COS  */
+    COTAN = 333,                   /* COTAN  */
+    CRONOMETRO = 334,              /* CRONOMETRO  */
+    DEBUG = 335,                   /* DEBUG  */
+    ECO = 336,                     /* ECO  */
+    EXP = 337,                     /* EXP  */
+    GRAUPRAD = 338,                /* GRAUPRAD  */
+    INT_FUNC = 339,                /* INT_FUNC  */
+    LOG = 340,                     /* LOG  */
+    LOGN = 341,                    /* LOGN  */
+    MAIUSC = 342,                  /* MAIUSC  */
+    MINUSC = 343,                  /* MINUSC  */
+    NUMPCARAC = 344,               /* NUMPCARAC  */
+    PAUSA = 345,                   /* PAUSA  */
+    PI = 346,                      /* PI  */
+    POS = 347,                     /* POS  */
+    QUAD = 348,                    /* QUAD  */
+    RADPGRAU = 349,                /* RADPGRAU  */
+    RAIZQ = 350,                   /* RAIZQ  */
+    RAND = 351,                    /* RAND  */
+    RANDI = 352,                   /* RANDI  */
+    SEN = 353,                     /* SEN  */
+    TIMER = 354,                   /* TIMER  */
+    TAN = 355,                     /* TAN  */
+    UMINUS = 356                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -92,7 +161,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 17 "src/parser.y"
+#line 27 "src/parser.y"
 
     int      ival;       // Para números inteiros e tipos
     float    fval;       // Para valores float 
@@ -102,7 +171,7 @@ union YYSTYPE
     Simbolo * sym;        // Para parâmetros individuais
     Simbolo * symlist;    // Para listas de parâmetros
 
-#line 106 "bin/parser.tab.h"
+#line 175 "bin/parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

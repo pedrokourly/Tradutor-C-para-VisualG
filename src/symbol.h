@@ -1,4 +1,4 @@
-    #define DEBUG 1
+    #define COMPILER_DEBUG 1
 
     #include <stdio.h>
     #include <stdlib.h>
