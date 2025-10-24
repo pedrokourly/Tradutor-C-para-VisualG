@@ -1,5 +1,8 @@
 %{
     #include "symbol.h" // Inclua o arquivo de cabeçalho para a tabela de símbolos
+    #include <stdio.h>  // Adicionado para FILE*
+    #include <stdlib.h> // Adicionado para malloc/exit
+    #include <string.h> // Adicionado para strdup/strcmp
 
     // Definição da estrutura para a tabela de símbolos
     Simbolo * symbol_table = NULL; // Ponteiro para a tabela de símbolos
@@ -29,13 +32,10 @@
     float    fval;       // Para valores float 
     char   * sval;       // Para identificadores e strings
     char     cval;       // Para caracteres
-    // outros tipos que você usar
     Simbolo * sym;        // Para parâmetros individuais
     Simbolo * symlist;    // Para listas de parâmetros
 }
 
- // Seção de definições de token.
- // O Bison precisa saber quais tokens ele pode receber do Flex.
 %token <sval> IDENTIFIER
 %token <ival> NUMBER
 %token <fval> FLOAT_LITERAL
@@ -96,10 +96,10 @@
 %right NAO UMINUS // Operadores unários (precedência alta)
 
 
- // Definição da gramática
+// Definição da gramática
 %%
 
- // A regra de início da gramática.
+// A regra de início da gramática.
 program: 
     ALGORITMO STRING_LITERAL
     declaracao_variaveis
@@ -131,8 +131,8 @@ variable_declaration:
             
             Simbolo* temp = current;
             current = current->next;
-            free(temp->name); // Libera o nome duplicado
-            free(temp);       // Libera o nó da lista
+            if (temp->name) free(temp->name); // Libera o nome duplicado
+            if (temp) free(temp);       // Libera o nó da lista
         }
     }
 ;
@@ -163,7 +163,7 @@ declaracao_subrotinas:
 
 // Especificador de tipo
 type_specifier:
-      INTEIRO     { $$ = INTEIRO; }
+    INTEIRO     { $$ = INTEIRO; }
     | REAL        { $$ = REAL; }
     | CARACTER    { $$ = CARACTER; }
     | LITERAL     { $$ = LITERAL; }
@@ -172,7 +172,7 @@ type_specifier:
 
 // Lista de parâmetros de função/procedimento
 parameter_list:
-      /* vazio */ { $$ = NULL; }
+    /* vazio */ { $$ = NULL; }
     | parameter_declaration { $$ = $1; }
     | parameter_list COMMA parameter_declaration {
         // Adiciona $3 ao final da lista $1
@@ -247,19 +247,13 @@ procedure_declaration:
 ;
 
 
- // Lista de comandos (statements)
+// Lista de comandos (statements)
 statement_list:
     /* vazio */
     | statement_list statement
 ;
 
 statement:
-    /* =================================================================== */
-    /* === MUDANÇA PRINCIPAL AQUI ===                                    === */
-    /* Trocamos 'assignment_statement' por 'expression'.                 */
-    /* 'expression' já inclui atribuições, chamadas de função (MUDACOR)   */
-    /* e identificadores simples (LIMPATELA).                            */
-    /* =================================================================== */
     expression
     | if_statement
     | while_statement
@@ -267,29 +261,49 @@ statement:
     | para_statement
     | escolha_statement
     | io_statement
-    | RETORNE expression
+    | RETORNE logical_or_expression /* Funções retornam valores */
     | INTERROMPA
 ;
 
 // Comandos de I/O
 io_statement:
     LEIA LPAREN identifier_list RPAREN
-    | ESCREVA LPAREN expression_list RPAREN
-    | ESCREVAL LPAREN expression_list RPAREN
+    | ESCREVA LPAREN write_list RPAREN
+    | ESCREVAL LPAREN write_list RPAREN
+    | ESCREVA LPAREN RPAREN
+    | ESCREVAL LPAREN RPAREN
+    | ESCREVAL /* ESCREVAL sozinho (só quebra de linha) */
 ;
 
-// Lista de expressões (para escreva, chamadas de função, etc.)
+/* =================================================================== */
+/* === REGRAS CORRIGIDAS AQUI ===                                    */
+/* Removemos a ambiguidade de write_format_option                     */
+/* =================================================================== */
+write_list:
+    write_parameter
+    | write_list COMMA write_parameter
+;
+
+write_parameter:
+    logical_or_expression
+    | logical_or_expression COLON NUMBER
+    | logical_or_expression COLON NUMBER COLON NUMBER
+;
+/* =================================================================== */
+
+// Lista de expressões (usada para chamadas de função)
+// Não pode conter atribuições, por isso usa logical_or_expression
 expression_list:
-    expression
-    | expression_list COMMA expression
+    logical_or_expression
+    | expression_list COMMA logical_or_expression
 ;
 
 // Comando 'se' (if)
 if_statement:
-    SE expression ENTAO
+    SE logical_or_expression ENTAO
     statement_list
     FIMSE
-    | SE expression ENTAO
+    | SE logical_or_expression ENTAO
     statement_list
     SENAO
     statement_list
@@ -298,7 +312,7 @@ if_statement:
 
 // Comando 'enquanto' (while)
 while_statement:
-    ENQUANTO expression FACA
+    ENQUANTO logical_or_expression FACA
     statement_list
     FIMENQUANTO
 ;
@@ -307,24 +321,22 @@ while_statement:
 repita_statement:
     REPITA
     statement_list
-    ATE expression
+    ATE logical_or_expression
 ;
 
 // Comando 'para' (for)
-// NOTA: O seu exemplo usa "DE 1 ATÉ 50", o parser espera um IDENTIFICADOR
-// (ex: PARA i DE 1 ATE 50). O seu exemplo 'PARA Celcius DE...' está correto.
 para_statement:
-    PARA IDENTIFIER DE expression ATE expression FACA
+    PARA IDENTIFIER DE logical_or_expression ATE logical_or_expression FACA
     statement_list
     FIMPARA
-    | PARA IDENTIFIER DE expression ATE expression PASSO expression FACA
+    | PARA IDENTIFIER DE logical_or_expression ATE logical_or_expression PASSO logical_or_expression FACA
     statement_list
     FIMPARA
 ;
 
 // Comando 'escolha' (switch)
 escolha_statement:
-    ESCOLHA expression
+    ESCOLHA logical_or_expression
     caso_list
     outrocaso_block
     FIMESCOLHA
@@ -332,7 +344,7 @@ escolha_statement:
 
 caso_list:
     /* vazio */
-    | caso_list CASO expression
+    | caso_list CASO logical_or_expression
       statement_list
 ;
 
@@ -342,14 +354,15 @@ outrocaso_block:
 ;
 
 
- // Expressões
+// Expressões
 expression:
+    /* Um comando pode ser uma atribuição OU um valor (ex: chamada de função) */
     assignment_statement
     | logical_or_expression
 ;
 
 assignment_statement:
-    IDENTIFIER ASSIGN expression
+    IDENTIFIER ASSIGN expression /* Uma atribuição pode ter outra atribuição (a := b := 10) */
     {
         Simbolo *s = find_symbol($1);
         if (s == NULL) {
@@ -409,7 +422,7 @@ unary_expression:
 ;
 
 primary_expression:
-      NUMBER
+    NUMBER
     | FLOAT_LITERAL
     | CHAR_LITERAL
     | STRING_LITERAL
@@ -419,17 +432,13 @@ primary_expression:
         // Ação Semântica: Verifica se o identificador já foi declarado.
         Simbolo *sym = find_symbol($1);
         if (sym == NULL) {
-            // NOTA: Comandos como LIMPATELA e MUDACOR
-            // vão falhar aqui se não estiverem na tabela de símbolos.
-            // Precisamos adicionar funções built-in na tabela.
-            // Por agora, vamos permitir, mas avisar.
-            // fprintf(stderr, "Aviso: Identificador '%s' não declarado (assumindo função built-in).\n", $1);
+            // Permitir funções built-in como LIMPATELA, MUDACOR, etc.
         }
         free($1);
     }
     | IDENTIFIER LPAREN expression_list RPAREN // Chamada de função
-    | IDENTIFIER LPAREN RPAREN // Chamada de função sem args
-    | LPAREN expression RPAREN
+    | IDENTIFIER LPAREN RPAREN // Chamada de função sem args (ex: LIMPATELA)
+    | LPAREN logical_or_expression RPAREN /* Parêntesis contêm valores */
 ;
 
 
