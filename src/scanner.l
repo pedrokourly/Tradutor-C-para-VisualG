@@ -24,6 +24,7 @@
 "^"             { return POWER; }
 
 "<-"            { return ASSIGN; }
+":="            { return ASSIGN; }
 
 "="             { return EQUAL; }
 "<>"            { return NEQ; }
@@ -121,10 +122,10 @@
 "timer"         { return TIMER; }
 "tan"           { return TAN; }
 
-[0-9]+\\.[0-9]+([eE][-+]?[0-9]+)?   { yylval.fval = atof(yytext); return FLOAT_LITERAL; }
-[0-9]+                             { yylval.ival = atoi(yytext); return NUMBER; }
-'[^']'                             { yylval.cval = yytext[1]; return CHAR_LITERAL; }
-\"([^\\\"]|\\.)*\"                 { yylval.sval = strdup(yytext); return STRING_LITERAL; }
+[0-9]+\.[0-9]+([eE][-+]?[0-9]+)?   { yylval.fval = atof(yytext); return FLOAT_LITERAL; }
+[0-9]+                              { yylval.ival = atoi(yytext); return NUMBER; }
+'[^']'                              { yylval.cval = yytext[1]; return CHAR_LITERAL; }
+\"([^\\\"]|\\.)*\"                  { yylval.sval = strdup(yytext); return STRING_LITERAL; }
 
 [a-zA-Z][a-zA-Z0-9_]* {
                   yylval.sval = strdup(yytext);
