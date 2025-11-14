@@ -12,7 +12,7 @@ teste:
 
 compile: clean parser scanner
 	mkdir -p $(BIN_DIR)
-	gcc $(CFLAGS) $(BIN_DIR)/parser.tab.c $(BIN_DIR)/lex.yy.c $(CPARAMS) -o $(BIN_DIR)/tradutor.exe
+	gcc $(CFLAGS) src/AST.c $(BIN_DIR)/parser.tab.c $(BIN_DIR)/lex.yy.c $(CPARAMS) -o $(BIN_DIR)/tradutor.exe
 
 parser:
 	mkdir -p $(BIN_DIR)

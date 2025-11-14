@@ -161,16 +161,15 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 30 "src/parser.y"
+#line 16 "src/parser.y"
 
     int      ival;       // Para números inteiros e tipos
     float    fval;       // Para valores float 
     char   * sval;       // Para identificadores e strings
     char     cval;       // Para caracteres
-    Simbolo * sym;        // Para parâmetros individuais
-    Simbolo * symlist;    // Para listas de parâmetros
+    struct ASTNode * node;  // Para nós da AST
 
-#line 174 "bin/parser.tab.h"
+#line 173 "bin/parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -1,28 +1,14 @@
 %{
-    #include "symbol.h" // Inclua o arquivo de cabeçalho para a tabela de símbolos
-    #include <stdio.h>  // Adicionado para FILE*
-    #include <stdlib.h> // Adicionado para malloc/exit
-    #include <string.h> // Adicionado para strdup/strcmp
-
-    // Definição da estrutura para a tabela de símbolos
-    Simbolo * symbol_table = NULL; // Ponteiro para a tabela de símbolos
-
-    int current_scope = 0; // 0 = global, 1 = local
+    #include "AST.h"
+    #include <stdio.h>  // Para FILE*
+    #include <stdlib.h> // Para malloc/exit
+    #include <string.h> // Para strdup/strcmp
     
     void yyerror(const char *s); // Declaração da função de erro do Bison
     extern int yylex(void); // Declaração da função do scanner, gerada pelo Flex
     extern FILE *yyin;      // Para definir o arquivo de entrada
     extern char *yytext;    // Para acessar o texto do token atual
     extern int yylineno;    // Para rastrear o número da linha
-    
-    // Funções que são usadas antes de serem definidas no final do arquivo
-    Simbolo* create_param(char *name, int type);
-    void insert_function(char *name, int return_type, Simbolo *params);
-    void insert_symbol(char *name, int type);
-    Simbolo *find_symbol(char *name);
-    Simbolo *find_symbol_in_scope(char *name, int scope);
-    const char* type_to_string(int type);
-    void print_symbol_table();
 %}
 
 // Definições de tipos de valores semânticos
@@ -32,8 +18,7 @@
     float    fval;       // Para valores float 
     char   * sval;       // Para identificadores e strings
     char     cval;       // Para caracteres
-    Simbolo * sym;        // Para parâmetros individuais
-    Simbolo * symlist;    // Para listas de parâmetros
+    struct ASTNode * node;  // Para nós da AST
 }
 
 %token <sval> IDENTIFIER
@@ -81,9 +66,19 @@
 
 // Definição dos tipos de valores semânticos para as regras
 %type <ival> type_specifier // Tipo de dado (int, float, etc.)
-%type <sym> parameter_declaration
-%type <symlist> parameter_list
-%type <symlist> identifier_list // Para "id1, id2: tipo"
+%type <node> program
+%type <node> declaracao_variaveis variable_declaration_list variable_declaration
+%type <node> declaracao_subrotinas function_declaration procedure_declaration
+%type <node> parameter_declaration parameter_list identifier_list
+%type <node> statement_list statement
+%type <node> expression assignment_statement
+%type <node> logical_or_expression logical_and_expression relational_expression
+%type <node> additive_expression multiplicative_expression power_expression
+%type <node> unary_expression primary_expression
+%type <node> if_statement while_statement repita_statement para_statement
+%type <node> escolha_statement caso_list outrocaso_block
+%type <node> io_statement
+%type <node> write_list write_parameter expression_list
 
 // Seção de precedência de operadores (do menor para o maior)
 %right ASSIGN
@@ -107,58 +102,97 @@ program:
     INICIO
     statement_list
     FIMALGORITMO
+    {
+        $$ = ast_create_program($2, $3, $4, $6);
+        ast_root = $$;
+        free($2);
+    }
 ;
 
 // Bloco de declaração de variáveis (VAR)
 declaracao_variaveis:
-    /* vazio */
-    | VAR variable_declaration_list
+    /* vazio */ { $$ = NULL; }
+    | VAR variable_declaration_list { $$ = $2; }
 ;
 
 variable_declaration_list:
-    variable_declaration
-    | variable_declaration_list variable_declaration
+    variable_declaration { $$ = $1; }
+    | variable_declaration_list variable_declaration {
+        // Encadeia as declarações
+        if ($1) {
+            ASTNode *temp = $1;
+            while (temp->data.var_decl.id_list && 
+                   temp->data.var_decl.id_list->data.var_list.next) {
+                temp = temp->data.var_decl.id_list->data.var_list.next;
+            }
+            // Procura o último nó da lista
+            temp = $1;
+            while (temp->data.stmt_list.next) {
+                temp = temp->data.stmt_list.next;
+            }
+            temp->data.stmt_list.next = $2;
+            $$ = $1;
+        } else {
+            $$ = $2;
+        }
+    }
 ;
 
 // Declaração de variável no formato VisuAlg: id1, id2 : tipo
 variable_declaration:
     identifier_list COLON type_specifier {
-        // Itera a lista de identificadores ($1) e insere cada um
-        // com o tipo especificado ($3)
-        Simbolo* current = $1;
-        while(current) {
-            insert_symbol(current->name, $3); 
-            
-            Simbolo* temp = current;
-            current = current->next;
-            if (temp->name) free(temp->name); // Libera o nome duplicado
-            if (temp) free(temp);       // Libera o nó da lista
-        }
+        ASTNode *type_node = ast_create_type($3);
+        $$ = ast_create_var_decl($1, type_node);
     }
 ;
 
 // Lista de identificadores (para declaração)
 identifier_list:
     IDENTIFIER { 
-        $$ = create_param($1, 0); // Reutiliza create_param para criar um nó
+        $$ = ast_create_var_list($1, NULL);
         free($1); 
     }
     | identifier_list COMMA IDENTIFIER {
-        Simbolo* newNode = create_param($3, 0);
+        ASTNode *newNode = ast_create_var_list($3, NULL);
         free($3);
         
-        Simbolo* list = $1;
-        while(list->next) list = list->next; // Vai até o fim da lista
-        list->next = newNode;
-        $$ = $1; // Retorna o início da lista
+        // Encontra o final da lista
+        ASTNode *temp = $1;
+        while (temp->data.var_list.next) {
+            temp = temp->data.var_list.next;
+        }
+        temp->data.var_list.next = newNode;
+        $$ = $1;
     }
 ;
 
 // Bloco de declaração de funções e procedimentos
 declaracao_subrotinas:
-    /* vazio */
-    | declaracao_subrotinas function_declaration
-    | declaracao_subrotinas procedure_declaration
+    /* vazio */ { $$ = NULL; }
+    | declaracao_subrotinas function_declaration {
+        if ($1) {
+            ASTNode *temp = $1;
+            while (temp->data.stmt_list.next) {
+                temp = temp->data.stmt_list.next;
+            }
+            temp->data.stmt_list.next = $2;
+            $$ = $1;
+        } else {
+            $$ = $2;
+        }
+    }
+    | declaracao_subrotinas procedure_declaration {
+        if ($1) {
+            ASTNode *temp = $1;
+            while (temp->data.stmt_list.next) {
+                temp = temp->data.stmt_list.next;
+            }
+            temp->data.stmt_list.next = $2;
+            $$ = $1;
+        } else {
+            $$ = $2;
+        }
+    }
 ;
 
 // Especificador de tipo
@@ -176,9 +210,11 @@ parameter_list:
     | parameter_declaration { $$ = $1; }
     | parameter_list COMMA parameter_declaration {
         // Adiciona $3 ao final da lista $1
-        Simbolo* list = $1;
-        while(list->next) list = list->next;
-        list->next = $3;
+        ASTNode *temp = $1;
+        while(temp->data.param.next) {
+            temp = temp->data.param.next;
+        }
+        temp->data.param.next = $3;
         $$ = $1;
     }
 ;
@@ -186,93 +222,76 @@ parameter_list:
 // Declaração de parâmetro individual: id : tipo
 parameter_declaration:
     IDENTIFIER COLON type_specifier {
-        $$ = create_param($1, $3); // Cria o símbolo do parâmetro
+        ASTNode *type_node = ast_create_type($3);
+        $$ = ast_create_param($1, type_node, NULL);
         free($1);
-        // NÃO insere na tabela de símbolos aqui.
-        // A função/procedimento fará isso ao entrar no escopo.
     }
 ;
 
 // Declaração de função
 function_declaration:
     FUNCAO IDENTIFIER LPAREN parameter_list RPAREN COLON type_specifier
-    {
-        // Ação 1: Inserir a função na tabela (escopo global)
-        // e mudar para o escopo local
-        insert_function($2, $7, $4); // $2=nome, $7=tipo, $4=params
-        current_scope = 1; // Entra no escopo local
-        
-        // Ação 2: Inserir os parâmetros no escopo local
-        Simbolo *p = $4;
-        while (p) {
-            insert_symbol(p->name, p->type);
-            p = p->next;
-        }
-        free($2);
-    }
-    declaracao_variaveis // Variáveis locais
+    declaracao_variaveis
     INICIO
     statement_list
     FIMFUNCAO
     {
-        current_scope = 0; // Volta para escopo global
-        // TODO: Limpar tabela de símbolos do escopo local
+        ASTNode *return_type = ast_create_type($7);
+        $$ = ast_create_func_decl($2, $4, return_type, $8, $10);
+        free($2);
     }
 ;
 
 // Declaração de procedimento
 procedure_declaration:
     PROCEDIMENTO IDENTIFIER LPAREN parameter_list RPAREN
-    {
-        // Ação 1: Inserir procedimento e mudar escopo
-        insert_function($2, 0, $4); // Usa tipo 0 (void) para procedimento
-        current_scope = 1; // Entra no escopo local
-        
-        // Ação 2: Inserir parâmetros no escopo local
-        Simbolo *p = $4;
-        while (p) {
-            insert_symbol(p->name, p->type);
-            p = p->next;
-        }
-        free($2);
-    }
-    declaracao_variaveis // Variáveis locais
+    declaracao_variaveis
     INICIO
     statement_list
     FIMPROCEDIMENTO
     {
-        current_scope = 0; // Volta para escopo global
-        // TODO: Limpar tabela de símbolos do escopo local
+        $$ = ast_create_func_decl($2, $4, NULL, $6, $8);
+        free($2);
     }
 ;
 
 
 // Lista de comandos (statements)
 statement_list:
-    /* vazio */
-    | statement_list statement
+    /* vazio */ { $$ = NULL; }
+    | statement_list statement {
+        if ($2) {
+            if ($1) {
+                $$ = ast_create_stmt_list($2, $1);
+            } else {
+                $$ = ast_create_stmt_list($2, NULL);
+            }
+        } else {
+            $$ = $1;
+        }
+    }
 ;
 
 statement:
-    expression
-    | if_statement
-    | while_statement
-    | repita_statement
-    | para_statement
-    | escolha_statement
-    | io_statement
-    | RETORNE logical_or_expression /* Funções retornam valores */
-    | INTERROMPA
+    expression { $$ = $1; }
+    | if_statement { $$ = $1; }
+    | while_statement { $$ = $1; }
+    | repita_statement { $$ = $1; }
+    | para_statement { $$ = $1; }
+    | escolha_statement { $$ = $1; }
+    | io_statement { $$ = $1; }
+    | RETORNE logical_or_expression { $$ = ast_create_return($2); }
+    | INTERROMPA { $$ = ast_create_break(); }
 ;
 
 // Comandos de I/O
 io_statement:
-    LEIA LPAREN identifier_list RPAREN
-    | ESCREVA LPAREN write_list RPAREN
-    | ESCREVAL LPAREN write_list RPAREN
-    | ESCREVA LPAREN RPAREN
-    | ESCREVAL LPAREN RPAREN
-    | ESCREVAL /* ESCREVAL sozinho (só quebra de linha) */
+    LEIA LPAREN identifier_list RPAREN { $$ = ast_create_read($3); }
+    | ESCREVA LPAREN write_list RPAREN { $$ = ast_create_write($3, 0); }
+    | ESCREVAL LPAREN write_list RPAREN { $$ = ast_create_write($3, 1); }
+    | ESCREVA LPAREN RPAREN { $$ = ast_create_write(NULL, 0); }
+    | ESCREVAL LPAREN RPAREN { $$ = ast_create_write(NULL, 1); }
+    | ESCREVAL { $$ = ast_create_write(NULL, 1); } /* ESCREVAL sozinho (só quebra de linha) */
 ;
 
 /* =================================================================== */
@@ -280,22 +299,41 @@ io_statement:
 /* Removemos a ambiguidade de write_format_option                     */
 /* =================================================================== */
 write_list:
-    write_parameter
-    | write_list COMMA write_parameter
+    write_parameter { $$ = $1; }
+    | write_list COMMA write_parameter {
+        if ($1) {
+            ASTNode *temp = $1;
+            while (temp->data.write_param.next) {
+                temp = temp->data.write_param.next;
+            }
+            temp->data.write_param.next = $3;
+            $$ = $1;
+        } else {
+            $$ = $3;
+        }
+    }
 ;
 
 write_parameter:
-    logical_or_expression
-    | logical_or_expression COLON NUMBER
-    | logical_or_expression COLON NUMBER COLON NUMBER
+    logical_or_expression { 
+        $$ = ast_create_write_param($1, -1, -1, NULL); 
+    }
+    | logical_or_expression COLON NUMBER { 
+        $$ = ast_create_write_param($1, $3, -1, NULL); 
+    }
+    | logical_or_expression COLON NUMBER COLON NUMBER { 
+        $$ = ast_create_write_param($1, $3, $5, NULL); 
+    }
 ;
 /* =================================================================== */
 
 // Lista de expressões (usada para chamadas de função)
 // Não pode conter atribuições, por isso usa logical_or_expression
 expression_list:
-    logical_or_expression
-    | expression_list COMMA logical_or_expression
+    logical_or_expression { $$ = ast_create_expr_list($1, NULL); }
+    | expression_list COMMA logical_or_expression {
+        $$ = ast_create_expr_list($3, $1);
+    }
 ;
 
 // Comando 'se' (if)
@@ -303,11 +341,13 @@ if_statement:
     SE logical_or_expression ENTAO
     statement_list
     FIMSE
+    { $$ = ast_create_if($2, $4, NULL); }
     | SE logical_or_expression ENTAO
     statement_list
     SENAO
     statement_list
     FIMSE
+    { $$ = ast_create_if($2, $4, $6); }
 ;
 
 // Comando 'enquanto' (while)
@@ -315,6 +355,7 @@ while_statement:
     ENQUANTO logical_or_expression FACA
     statement_list
     FIMENQUANTO
+    { $$ = ast_create_while($2, $4); }
 ;
 
 // Comando 'repita' (repeat-until)
@@ -322,6 +363,7 @@ repita_statement:
     REPITA
     statement_list
     ATE logical_or_expression
+    { $$ = ast_create_repeat($2, $4); }
 ;
 
 // Comando 'para' (for)
@@ -329,9 +371,17 @@ para_statement:
     PARA IDENTIFIER DE logical_or_expression ATE logical_or_expression FACA
     statement_list
     FIMPARA
+    { 
+        $$ = ast_create_for($2, $4, $6, NULL, $8);
+        free($2);
+    }
     | PARA IDENTIFIER DE logical_or_expression ATE logical_or_expression PASSO logical_or_expression FACA
     statement_list
     FIMPARA
+    {
+        $$ = ast_create_for($2, $4, $6, $8, $10);
+        free($2);
+    }
 ;
 
 // Comando 'escolha' (switch)
@@ -340,105 +390,153 @@ escolha_statement:
     caso_list
     outrocaso_block
     FIMESCOLHA
+    { $$ = ast_create_switch($2, $3, $4); }
 ;
 
 caso_list:
-    /* vazio */
+    /* vazio */ { $$ = NULL; }
     | caso_list CASO logical_or_expression
       statement_list
+    {
+        ASTNode *new_case = ast_create_case($3, $4, NULL);
+        if ($1) {
+            ASTNode *temp = $1;
+            while (temp->data.case_stmt.next) {
+                temp = temp->data.case_stmt.next;
+            }
+            temp->data.case_stmt.next = new_case;
+            $$ = $1;
+        } else {
+            $$ = new_case;
+        }
+    }
 ;
 
 outrocaso_block:
-    /* vazio */
-    | OUTROCASO statement_list
+    /* vazio */ { $$ = NULL; }
+    | OUTROCASO statement_list { $$ = $2; }
 ;
 
 
 // Expressões
 expression:
     /* Um comando pode ser uma atribuição OU um valor (ex: chamada de função) */
-    assignment_statement
-    | logical_or_expression
+    assignment_statement { $$ = $1; }
+    | logical_or_expression { $$ = $1; }
 ;
 
 assignment_statement:
     IDENTIFIER ASSIGN expression /* Uma atribuição pode ter outra atribuição (a := b := 10) */
     {
-        Simbolo *s = find_symbol($1);
-        if (s == NULL) {
-            char error_msg[100];
-            sprintf(error_msg, "Variável '%s' não declarada.", $1);
-            yyerror(error_msg);
-            YYABORT;
-        }
-        // TODO: Verificação de tipo
+        $$ = ast_create_assign($1, $3);
         free($1);
     }
 ;
 
 logical_or_expression:
-    logical_and_expression
-    | logical_or_expression OU logical_and_expression
-    | logical_or_expression XOU logical_and_expression
+    logical_and_expression { $$ = $1; }
+    | logical_or_expression OU logical_and_expression {
+        $$ = ast_create_binary_op(AST_OR, $1, $3);
+    }
+    | logical_or_expression XOU logical_and_expression {
+        $$ = ast_create_binary_op(AST_XOR, $1, $3);
+    }
 ;
 
 logical_and_expression:
-    relational_expression
-    | logical_and_expression E relational_expression
+    relational_expression { $$ = $1; }
+    | logical_and_expression E relational_expression {
+        $$ = ast_create_binary_op(AST_AND, $1, $3);
+    }
 ;
 
 relational_expression:
-    additive_expression
-    | relational_expression EQUAL additive_expression
-    | relational_expression NEQ additive_expression
-    | relational_expression LT additive_expression
-    | relational_expression GT additive_expression
-    | relational_expression LTE additive_expression
-    | relational_expression GTE additive_expression
+    additive_expression { $$ = $1; }
+    | relational_expression EQUAL additive_expression {
+        $$ = ast_create_binary_op(AST_EQ, $1, $3);
+    }
+    | relational_expression NEQ additive_expression {
+        $$ = ast_create_binary_op(AST_NEQ, $1, $3);
+    }
+    | relational_expression LT additive_expression {
+        $$ = ast_create_binary_op(AST_LT, $1, $3);
+    }
+    | relational_expression GT additive_expression {
+        $$ = ast_create_binary_op(AST_GT, $1, $3);
+    }
+    | relational_expression LTE additive_expression {
+        $$ = ast_create_binary_op(AST_LTE, $1, $3);
+    }
+    | relational_expression GTE additive_expression {
+        $$ = ast_create_binary_op(AST_GTE, $1, $3);
+    }
 ;
 
 additive_expression:
-    multiplicative_expression
-    | additive_expression PLUS multiplicative_expression
-    | additive_expression MINUS multiplicative_expression
+    multiplicative_expression { $$ = $1; }
+    | additive_expression PLUS multiplicative_expression {
+        $$ = ast_create_binary_op(AST_ADD, $1, $3);
+    }
+    | additive_expression MINUS multiplicative_expression {
+        $$ = ast_create_binary_op(AST_SUB, $1, $3);
+    }
 ;
 
 multiplicative_expression:
-    power_expression
-    | multiplicative_expression TIMES power_expression
-    | multiplicative_expression DIVIDE power_expression
-    | multiplicative_expression INT_DIVIDE power_expression
+    power_expression { $$ = $1; }
+    | multiplicative_expression TIMES power_expression {
+        $$ = ast_create_binary_op(AST_MUL, $1, $3);
+    }
+    | multiplicative_expression DIVIDE power_expression {
+        $$ = ast_create_binary_op(AST_DIV, $1, $3);
+    }
+    | multiplicative_expression INT_DIVIDE power_expression {
+        $$ = ast_create_binary_op(AST_INT_DIV, $1, $3);
+    }
 ;
 
 power_expression:
-    unary_expression
-    | unary_expression POWER power_expression // Certo-associativo
+    unary_expression { $$ = $1; }
+    | unary_expression POWER power_expression { // Certo-associativo
+        $$ = ast_create_binary_op(AST_POWER, $1, $3);
+    }
 ;
 
 unary_expression:
-    primary_expression
-    | MINUS unary_expression %prec UMINUS
-    | NAO unary_expression
+    primary_expression { $$ = $1; }
+    | MINUS unary_expression %prec UMINUS {
+        $$ = ast_create_unary_op(AST_NEG, $2);
+    }
+    | NAO unary_expression {
+        $$ = ast_create_unary_op(AST_NOT, $2);
+    }
 ;
 
 primary_expression:
-    NUMBER
-    | FLOAT_LITERAL
-    | CHAR_LITERAL
-    | STRING_LITERAL
-    | VERDADEIRO
-    | FALSO
-    | IDENTIFIER {
-        // Ação Semântica: Verifica se o identificador já foi declarado.
-        Simbolo *sym = find_symbol($1);
-        if (sym == NULL) {
-            // Permitir funções built-in como LIMPATELA, MUDACOR, etc.
-        }
+    NUMBER { $$ = ast_create_number($1); }
+    | FLOAT_LITERAL { $$ = ast_create_float($1); }
+    | CHAR_LITERAL { $$ = ast_create_char($1); }
+    | STRING_LITERAL { 
+        $$ = ast_create_string($1);
         free($1);
     }
-    | IDENTIFIER LPAREN expression_list RPAREN // Chamada de função
-    | IDENTIFIER LPAREN RPAREN // Chamada de função sem args (ex: LIMPATELA)
-    | LPAREN logical_or_expression RPAREN /* Parêntesis contêm valores */
+    | VERDADEIRO { $$ = ast_create_boolean(1); }
+    | FALSO { $$ = ast_create_boolean(0); }
+    | IDENTIFIER {
+        $$ = ast_create_identifier($1);
+        free($1);
+    }
+    | IDENTIFIER LPAREN expression_list RPAREN { // Chamada de função
+        $$ = ast_create_func_call($1, $3);
+        free($1);
+    }
+    | IDENTIFIER LPAREN RPAREN { // Chamada de função sem args (ex: LIMPATELA)
+        $$ = ast_create_func_call($1, NULL);
+        free($1);
+    }
+    | LPAREN logical_or_expression RPAREN { /* Parêntesis contêm valores */
+        $$ = $2;
+    }
 ;
 
 
@@ -467,13 +565,18 @@ int main(int argc, char **argv) {
     // Inicia o processo de parsing
     if (yyparse() == 0) {
         printf("Análise sintática bem-sucedida!\n");
+        
+        // Imprime a árvore sintática
+        if (ast_root) {
+            printf("\n\n=== Árvore Sintática Abstrata (AST) ===\n\n");
+            ast_print(ast_root, 0);
+            
+            // Libera a memória da AST
+            ast_free(ast_root);
+        }
     } else {
         printf("Análise sintática falhou.\n");
     }
-
-    // Imprime a tabela de símbolos ao final da análise
-    printf("\n\nAnálise concluída. Tabela de Símbolos:\n");
-    print_symbol_table();
 
     if (file) {
         fclose(file);
@@ -487,134 +590,3 @@ void yyerror(const char *s) {
     fprintf(stderr, "Erro de sintaxe na linha %d: %s. Próximo a: '%s'\n", yylineno, s, yytext);
 }
 
-// Funções para manipulação da Tabela de Símbolos
-
-void insert_symbol(char *name, int type) {
-    // Implementação simples de lista encadeada.
-    // Verifica se o símbolo já existe no escopo atual
-    Simbolo * existing = find_symbol_in_scope(name, current_scope);
-    if (existing != NULL) {
-        fprintf(stderr, "Erro semântico: Identificador '%s' já declarado neste escopo (linha %d).\n", name, yylineno);
-        exit(1);
-    }
-    
-    Simbolo * new_symbol = (Simbolo *) malloc(sizeof(Simbolo));
-
-    if (! new_symbol) { 
-        fprintf(stderr, "malloc failed\n"); 
-        exit(1); 
-    }
-
-    new_symbol->name = strdup(name);
-    if (! new_symbol->name) { 
-        fprintf(stderr, "strdup failed\n"); 
-        exit(1); 
-    }
-
-    new_symbol->type = type;
-    new_symbol->scope = current_scope; // variavel global/local
-    new_symbol->is_function = 0;       // por padrão, é uma variável
-    new_symbol->params = NULL;         // não é uma função, então sem parâmetros
-    new_symbol->next = symbol_table;
-    symbol_table = new_symbol;
-}
-
-Simbolo *find_symbol(char *name) {
-    // Procura primeiro no escopo local, depois no global
-    Simbolo *s = find_symbol_in_scope(name, 1); // Local
-    if (s) return s;
-    s = find_symbol_in_scope(name, 0); // Global
-    return s;
-}
-
-Simbolo * find_symbol_in_scope(char *name, int scope) {
-    Simbolo * current = symbol_table;
-    while (current != NULL) {
-        if (strcmp(current->name, name) == 0 && current->scope == scope) {
-            return current;
-        }
-        current = current->next;
-    }
-    return NULL;
-}
-
-const char* type_to_string(int type) {
-    switch (type) {
-        case INTEIRO:   return "INTEIRO";
-        case REAL:      return "REAL";
-        case CARACTER:  return "CARACTER";
-        case LITERAL:   return "LITERAL";
-        case LOGICO:    return "LOGICO";
-        case 0:         return "PROCEDIMENTO"; // Nosso "void"
-        default:        return "desconhecido";
-    }
-}
-
-void print_symbol_table() {
-    Simbolo *current = symbol_table;
-    printf("\n\nTabela de Símbolos:\n");
-    printf("%-15s\t%-15s\t%s\t%s\t%s\n", "Nome", "Tipo", "Escopo", "Categoria", "Parâmetros");
-    printf("--------------------------------------------------------------------------\n");
-    while (current != NULL) {
-        if (current->is_function) {
-            printf("%-15s\t%-15s\t%s\tfunção\t\t", current->name, type_to_string(current->type), current->scope == 0 ? "global" : "local");
-            Simbolo *p = current->params;
-            while (p) {
-                printf("%s:%s ", p->name, type_to_string(p->type));
-                p = p->next;
-            }
-            printf("\n");
-        } else {
-            printf("%-15s\t%-15s\t%d\tvariavel\n", current->name, type_to_string(current->type), current->scope);
-        }
-        current = current->next;
-    }
-}
-
-void insert_function(char *name, int return_type, Simbolo *params) {
-    if (find_symbol_in_scope(name, 0)) { // Funções só podem ser globais
-        fprintf(stderr, "Erro: função/procedimento '%s' já declarado.\n", name);
-        exit(1);
-    }
-    
-    Simbolo *func = malloc(sizeof(Simbolo));
-    
-    if (! func) { 
-        fprintf(stderr, "malloc failed\n"); 
-        exit(1); 
-    }
-
-    func->name = strdup(name);
-    if (! func->name) { 
-        fprintf(stderr, "strdup failed\n"); 
-        exit(1); 
-    }
-
-    func->type = return_type;
-    func->scope = current_scope; // Deve ser 0 (global)
-    func->is_function = 1;
-    func->params = params;
-    func->next = symbol_table;
-    symbol_table = func;
-}
-
-Simbolo* create_param(char *name, int type) {
-    Simbolo *param = malloc(sizeof(Simbolo));
-    if (! param) { 
-        fprintf(stderr, "malloc failed\n"); 
-        exit(1); 
-    }
-
-    param->name = strdup(name);
-    if (! param->name) { 
-        fprintf(stderr, "strdup failed\n"); 
-        exit(1); 
-    }
-
-    param->type = type;
-    param->scope = 1; // Parâmetros são sempre escopo local
-    param->is_function = 0;
-    param->params = NULL;
-    param->next = NULL;
-    return param;
-}
