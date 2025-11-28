@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_YY_BIN_PARSER_TAB_H_INCLUDED
-# define YY_YY_BIN_PARSER_TAB_H_INCLUDED
+#ifndef YY_YY_PARSER_TAB_H_INCLUDED
+# define YY_YY_PARSER_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -161,7 +161,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 17 "src/parser.y"
+#line 17 "parser.y"
 
     int      ival;       // Para números inteiros e tipos
     float    fval;       // Para valores float 
@@ -169,7 +169,7 @@ union YYSTYPE
     char     cval;       // Para caracteres
     struct ASTNode * node;  // Para nós da AST
 
-#line 173 "bin/parser.tab.h"
+#line 173 "parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -184,4 +184,4 @@ extern YYSTYPE yylval;
 int yyparse (void);
 
 
-#endif /* !YY_YY_BIN_PARSER_TAB_H_INCLUDED  */
+#endif /* !YY_YY_PARSER_TAB_H_INCLUDED  */

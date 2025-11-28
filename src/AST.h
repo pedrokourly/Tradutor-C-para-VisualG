@@ -103,6 +103,7 @@ typedef struct ASTNode {
         struct {
             struct ASTNode *id_list;  /* lista de identificadores */
             struct ASTNode *type;     /* tipo */
+            struct ASTNode *next;
         } var_decl;
         
         /* Para lista de identificadores ou variáveis */

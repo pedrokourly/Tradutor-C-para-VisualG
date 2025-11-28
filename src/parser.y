@@ -1,5 +1,6 @@
 %{
     #include "AST.h"
+    #include "codegen.h"
     #include <stdio.h>  // Para FILE*
     #include <stdlib.h> // Para malloc/exit
     #include <string.h> // Para strdup/strcmp
@@ -116,21 +117,20 @@ declaracao_variaveis:
 ;
 
 variable_declaration_list:
-    variable_declaration { $$ = $1; }
+    variable_declaration { 
+        $$ = $1; 
+    }
     | variable_declaration_list variable_declaration {
-        // Encadeia as declarações
+        // Encadeia a nova declaração ($2) ao final da lista existente ($1)
         if ($1) {
             ASTNode *temp = $1;
-            while (temp->data.var_decl.id_list && 
-                   temp->data.var_decl.id_list->data.var_list.next) {
-                temp = temp->data.var_decl.id_list->data.var_list.next;
+            // Percorre até achar o último nó da lista de declarações
+            // Nota: Estamos usando 'data.var_decl.next'. 
+            // Se der erro aqui, verifique o passo 2 abaixo (AST.h)
+            while (temp->data.var_decl.next != NULL) {
+                temp = temp->data.var_decl.next;
             }
-            // Procura o último nó da lista
-            temp = $1;
-            while (temp->data.stmt_list.next) {
-                temp = temp->data.stmt_list.next;
-            }
-            temp->data.stmt_list.next = $2;
+            temp->data.var_decl.next = $2;
             $$ = $1;
         } else {
             $$ = $2;
@@ -571,6 +571,23 @@ int main(int argc, char **argv) {
             printf("\n\n=== Árvore Sintática Abstrata (AST) ===\n\n");
             ast_print(ast_root, 0);
             
+            // 2. GERAÇÃO DE CÓDIGO
+            printf("\nTraduzindo para C...\n");
+            
+            // Define nome do arquivo de saída (ex: output.c)
+            const char *out_filename = "output.c";
+            FILE *f_out = fopen(out_filename, "w");
+            
+            if (!f_out) {
+                perror("Erro ao criar arquivo de saida");
+                // Não retorna erro fatal, apenas não gera o código
+            } else {
+                // Chama a função do codegen.c
+                generate_code(ast_root, f_out);
+                
+                fclose(f_out);
+                printf("Sucesso! Codigo gerado em: %s\n", out_filename);
+            }
             // Libera a memória da AST
             ast_free(ast_root);
         }
